@@ -16,7 +16,7 @@ function usage()
     echo "## -t: find 95th percentile per request-type"
     echo "## -v: enable verbose results"
     echo "##"
-    echo "## Usage: $(basename $0) [-v]  [-h] [-t request_type ] logfile.log"
+    echo "## Usage: $(basename $0) [-v] [-h] [-t request_type ] logfile.log"
     echo "###########"
     echo ""
 }
