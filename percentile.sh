@@ -83,7 +83,7 @@ function check_full_log_file()
 }
 
 
-### 2 - The value at the 95th percentile for every hour of the day in question
+### 2 - The value at the 95th percentile for every hour of the day in question ###
 function check_full_log_file_hourly()
 {
     sorted=($(cat $log_file | grep -v ^$ | sort -n -t: -k3))
