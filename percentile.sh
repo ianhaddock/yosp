@@ -140,29 +140,25 @@ function check_by_request()
 function check_by_request_hourly()
 {
     sorted=($(cat $log_file | grep -v ^$ | grep $request_type | sort -n -t: -k3 ) )
+    #echo ${sorted[@]}
     hours_in_log=( $(cat $log_file | cut -b -10 | uniq) )
 
     for h in ${hours_in_log[@]}; do
-
-        for e in ${sorted[@]}; do
-
-            if [ $h == $(echo $e | cut -b -10) ] && [ $(echo $e | awk -F: '{print $3}') -gt $response_limit ]; then
-                #echo "$h is $(echo $e | cut -b -10)"
-                hour_list+=($e)
+        full_hour_list=$(cat $log_file | grep "$request_type" | grep "$h" | sort -n -t: -k3 )
+        #echo ${full_hour_list[@]}
+        for f in ${full_hour_list[@]}; do
+            entry=$(echo $f | awk -F: '{print $3}')
+            #echo $entry
+            if [ $entry -gt $response_limit ]; then
+                hour_list+=($f)
             fi
-            #echo "$e is not $(echo $h | cut -b -10)"
         done
+        #echo $hour_list
+        perc=$(echo \(${#hour_list[@]}*0.95\) / 1 | bc )
+        echo "${h}: $(echo ${hour_list[$perc]} | awk -F: '{ print $3 }' )"
+        hour_list=()
+    done 
 
-        #echo ${hour_list[@]}
-        if [ ${hour_list[0]} ]; then
-            perc=$(echo \(${#hour_list[@]}*0.95\) / 1 | bc )
-            echo "${h}: $(echo ${hour_list[$perc]} | awk -F: '{ print $3 }' )"
-            hour_list=()
-        elif [ $verbose = True ]; then
-            echo "${h}: No times above $response_limit found."
-        fi
-
-    done
 }
 
 
