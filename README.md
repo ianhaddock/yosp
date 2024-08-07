@@ -13,7 +13,7 @@
 ## -t: find 95th percentile per request-type
 ## -v: enable verbose results
 ##
-## Usage: percentile.sh [-v] [-h] [-t request_type ] logfile.log
+## Usage: percentile.sh [-h] [-t request_type ] logfile.log
 ###########
 
 ERROR: Please provide a valid log file.
