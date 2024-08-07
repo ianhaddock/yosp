@@ -97,7 +97,7 @@ function check_by_request()
     sorted=($(cat $log_file | grep -v ^$ | grep $request_type | sort -n -t: -k3 | awk -F: '{ print $3 }'))
     lines=$(( ${#sorted[@]} -1 ))
 
-    # b sort 
+    # b sort
     last=$lines
     first=0
     middle=0
@@ -127,35 +127,42 @@ function check_by_request()
 ### 4 - The value at the 95th percentile of all response times above 1500 for just Entity4 every hour ###
 function check_by_request_hourly()
 {
-    hours_in_log=( $(cat $log_file | cut -b -10 | uniq) )
+    hours_in_log=( $(cat $log_file | grep "${request_type}" | cut -b -10 | uniq) )
 
     for hour in ${hours_in_log[@]}; do
         full_hour_list=( $(cat $log_file | grep "$request_type" | grep "$hour" | grep SUCCESS |  sort -n -t: -k3 | awk -F: '{ print $3 }' ) )
         lines=$(( ${#full_hour_list[@]} -1 ))
 
-        # b sort 
-        last=$lines
-        first=0
-        middle=0
-        while [ $(( $last - $first )) -ne 1 ]; do
-            middle=$(( ${first} + (${last} - ${first}) / 2 ))
-            item=${full_hour_list[${middle}]}
+        # edge case: if there is a single entry in an hour
+        if [ ${lines} -eq 0 ]; then
+            echo "${hour}: ${full_hour_list[${1}]}"
+        else
 
-            if [ ${item} -eq ${response_limit} ]; then
-                break
-            elif [ ${item} -lt ${response_limit} ]; then
-                first=$(( ${middle} )) #+ 1 ))
-            elif [ ${item} -gt ${response_limit} ]; then
-                last=$(( ${middle} )) #- 1 ))
-            fi
+            # b sort
+            last=$lines
+            first=0
+            middle=0
+            while [ $(( $last - $first )) -ne 1 ]; do
+                middle=$(( ${first} + (${last} - ${first}) / 2 ))
+                item=${full_hour_list[${middle}]}
 
-        done
+                if [ ${item} -eq ${response_limit} ]; then
+                    break
+                elif [ ${item} -lt ${response_limit} ]; then
+                    first=$(( ${middle} )) #+ 1 ))
+                elif [ ${item} -gt ${response_limit} ]; then
+                    last=$(( ${middle} )) #- 1 ))
+                fi
 
-        list_size=$(( ${lines} - ${middle} + 1 )) 
-        percentile=$(echo \(${list_size}*0.95\) / 1 | bc )
-        offset=$(( ${middle} + ${percentile} ))
-        # echo "percentile: ${percentile} offset: ${offset}"
-        echo "${hour}: ${full_hour_list[${offset}]}"
+            done
+
+            list_size=$(( ${lines} - ${middle} + 1 ))
+            percentile=$(echo \(${list_size}*0.95\) / 1 | bc )
+            offset=$(( ${middle} + ${percentile} ))
+            #echo "percentile: ${percentile} offset: ${offset}"
+            echo "${hour}: ${full_hour_list[${offset}]}"
+
+        fi
 
     done 
 
