@@ -69,7 +69,7 @@ fi
 ### 1 - The value at the 95th percentile of response time across the whole log file ###
 function check_full_log_file() 
 {
-    sorted=($(cat $log_file | grep -v ^$ | sort -n -t: -k3))
+    sorted=($(cat $log_file | grep -v ^$ | grep SUCCESS | sort -n -t: -k3))
     #echo ${sorted[@]}
     
     lines=${#sorted[@]} 
@@ -86,52 +86,55 @@ function check_full_log_file()
 ### 2 - The value at the 95th percentile for every hour of the day in question ###
 function check_full_log_file_hourly()
 {
-    sorted=($(cat $log_file | grep -v ^$ | sort -n -t: -k3))
+
     hours_in_log=( $(cat $log_file | cut -b -10 | uniq) )
-    
-        for h in ${hours_in_log[@]}; do
-    
-            for e in ${sorted[@]}; do
-    
-                if [ $h == $(echo $e | cut -b -10) ]; then
-                    hour_list+=($e)
-                    #echo "$h is $(echo $e | cut -b -10)"
-                fi
-                #echo "$e is not $(echo $h | cut -b -10)"
-            done
-    
-            #echo ${hour_list[@]}
-            perc=$(echo \(${#hour_list[@]}*0.95\) / 1 | bc )
-            echo "${h}: $(echo ${hour_list[$perc]} | awk -F: '{ print $3 }' )"
-            hour_list=()
-    
-        done
+
+    for hour in ${hours_in_log[@]}; do
+        full_hour_list=( $(cat $log_file | grep "$hour" | grep SUCCESS |  sort -n -t: -k3 ) )
+        list_end=$(( ${#full_hour_list[@]}  ))
+
+        percentile=$(echo \(${list_end}*0.95\) / 1 | bc )
+        echo "${hour}: $(echo ${full_hour_list[${percentile}]} | awk -F: '{ print $3 }' )"
+
+    done 
+
 }
 
 
-### 3 - The value at the 95th percentile of all response times abovei 1500 for just Entity4 across the whole log file ###
+### 3 - The value at the 95th percentile of all response times above 1500 for just Entity4 across the whole log file ###
 function check_by_request()
 {
-    top_list=()
-    sorted=($(cat $log_file | grep -v ^$ | grep $request_type | sort -n -t: -k3 | awk -F: '{ print $3 }'))
 
-    for i in ${sorted[@]}; do
-        if [ $i -gt $response_limit ]; then
-            top_list+=($i)
+    sorted=($(cat $log_file | grep -v ^$ | grep $request_type | sort -n -t: -k3 | awk -F: '{ print $3 }'))
+    list_end=$(( ${#sorted[@]} -1 ))
+
+    # b sort 
+    last=$list_end
+    first=0
+    middle=0
+    while [ $(( $last - $first )) -ne 1 ]; do
+        middle=$(( ${first} + (${last} - ${first}) / 2 ))
+        item=$(echo ${sorted[${middle}]} )
+
+        #echo "first: ${first}, middle: ${middle}, last: ${last}, item: ${item}"
+
+        if [ ${item} -eq ${response_limit} ]; then
+            #item=$(echo ${full_hour_list[$(( ${middle} -1 ))]} | awk -F: '{ print $3 }' )
+            #middle=$(( ${middle} -1 ))
+            break
+        elif [ ${item} -lt ${response_limit} ]; then
+            first=$(( ${middle} )) #+ 1 ))
+        elif [ ${item} -gt ${response_limit} ]; then
+            last=$(( ${middle} )) #- 1 ))
         fi
+
     done
-    
-    #echo "top list ${top_list[@]}"
-    
-    perc=$(echo \(${#top_list[@]}*0.95\) / 1 | bc )
-    
-    #echo "95th percentile line: $perc"
-    
-    if [ ${top_list[0]} ]; then
-        echo "${top_list[$perc]}"
-    elif [ $verbose = True ]; then
-        echo "No times above $response_limit found."
-    fi
+
+    list_size=$(( ${list_end} - ${middle} + 1 )) 
+    percentile=$(echo \(${list_size}*0.95\) / 1 | bc )
+    offset=$(( ${middle} + ${percentile} ))
+    #echo "percentile: ${percentile} offset: ${offset}"
+    echo "$(echo ${sorted[${offset}]} )"
 
 }
 
@@ -139,24 +142,44 @@ function check_by_request()
 ### 4 - The value at the 95th percentile of all response times above 1500 for just Entity4 every hour ###
 function check_by_request_hourly()
 {
-    sorted=($(cat $log_file | grep -v ^$ | grep $request_type | sort -n -t: -k3 ) )
-    #echo ${sorted[@]}
+
     hours_in_log=( $(cat $log_file | cut -b -10 | uniq) )
 
-    for h in ${hours_in_log[@]}; do
-        full_hour_list=$(cat $log_file | grep "$request_type" | grep "$h" | sort -n -t: -k3 )
-        #echo ${full_hour_list[@]}
-        for f in ${full_hour_list[@]}; do
-            entry=$(echo $f | awk -F: '{print $3}')
-            #echo $entry
-            if [ $entry -gt $response_limit ]; then
-                hour_list+=($f)
+    for hour in ${hours_in_log[@]}; do
+        full_hour_list=( $(cat $log_file | grep "$request_type" | grep "$hour" | grep SUCCESS |  sort -n -t: -k3 ) )
+        list_end=$(( ${#full_hour_list[@]} -1 ))
+        #echo "list end: $list_end"
+
+        # b sort 
+        last=$list_end
+        first=0
+        middle=0
+        while [ $(( $last - $first )) -ne 1 ]; do
+            middle=$(( ${first} + (${last} - ${first}) / 2 ))
+            item=$(echo ${full_hour_list[${middle}]} | awk -F: '{ print $3 }' )
+
+            #echo "first: ${first}, middle: ${middle}, last: ${last}, item: ${item}"
+
+            if [ ${item} -eq ${response_limit} ]; then
+                #item=$(echo ${full_hour_list[$(( ${middle} -1 ))]} | awk -F: '{ print $3 }' )
+                #middle=$(( ${middle} -1 ))
+                break
+            elif [ ${item} -lt ${response_limit} ]; then
+                first=$(( ${middle} )) #+ 1 ))
+            elif [ ${item} -gt ${response_limit} ]; then
+                last=$(( ${middle} )) #- 1 ))
             fi
+
         done
-        #echo $hour_list
-        perc=$(echo \(${#hour_list[@]}*0.95\) / 1 | bc )
-        echo "${h}: $(echo ${hour_list[$perc]} | awk -F: '{ print $3 }' )"
-        hour_list=()
+
+        #echo "###first: ${first}, middle: ${middle}, last: ${last}, item: ${item}"
+
+        list_size=$(( ${list_end} - ${middle} + 1 )) 
+        percentile=$(echo \(${list_size}*0.95\) / 1 | bc )
+        offset=$(( ${middle} + ${percentile} ))
+        # echo "percentile: ${percentile} offset: ${offset}"
+        echo "${hour}: $(echo ${full_hour_list[${offset}]} | awk -F: '{ print $3 }' )"
+
     done 
 
 }
