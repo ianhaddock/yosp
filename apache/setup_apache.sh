@@ -4,8 +4,8 @@
 
 
 # install apache, tools, and bc for the script
-#sudo dnf update -y
-sudo dnf install -y httpd httpd-tools bc 
+#sudo yum update -y
+sudo yum install -y httpd httpd-tools bc
 
 # add folders
 if [ ! -d /var/www/cache ]; then
@@ -27,6 +27,12 @@ sudo cp -v ./output.conf /etc/httpd/conf.d/output.conf
 
 # add 18080 to SELinux http port allow rules
 sudo semanage port -a -t http_port_t -p tcp 18080
+
+# add firewall rule
+firewall-cmd --add-port 18080/tcp
+
+# optional make firewall rule permanent
+firewall-cmd --add-port 18080/tcp --permanent
 
 # startup apache 
 sudo systemctl enable httpd
